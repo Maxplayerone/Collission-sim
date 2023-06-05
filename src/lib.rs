@@ -6,24 +6,56 @@ extern crate gl;
 use self::gl::types::*;
 
 use std::sync::mpsc::Receiver;
+use std::ffi::CString;
 use std::ptr;
+use std::str;
 use std::mem;
 use std::os::raw::c_void;
 
-mod shader;
-use shader::{ShaderError, Shader, ShaderProgram};
-
-
+// settings
 const SCR_WIDTH: u32 = 800;
 const SCR_HEIGHT: u32 = 600;
 
+const vertexShaderSource: &str = r#"
+    #version 330 core
+    layout (location = 0) in vec3 aPos;
+    void main() {
+       gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);
+    }
+"#;
+
+const fragmentShaderSource: &str = r#"
+    #version 330 core
+    out vec4 fragColor;
+    uniform vec2 u_resolution;
+
+    void main() {
+        vec2 uv = gl_FragCoord.xy/u_resolution.xy * 2.0 - 1.0;
+
+        float aspect = u_resolution.x / u_resolution.y;
+        uv.x *= aspect;
+
+        fragColor.rg = uv;
+        fragColor.b = 0.0;
+        float distance = 1.0 - length(uv); 
+        distance = step(0.0, distance);
+        fragColor.rgb = vec3(distance);        
+
+    }
+"#;
+
 #[allow(non_snake_case)]
-pub fn run() -> Result<(), ShaderError>{
-    //glfw
+pub fn run() {
+    // glfw: initialize and configure
+    // ------------------------------
     let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
     glfw.window_hint(glfw::WindowHint::ContextVersion(3, 3));
     glfw.window_hint(glfw::WindowHint::OpenGlProfile(glfw::OpenGlProfileHint::Core));
+    #[cfg(target_os = "macos")]
+    glfw.window_hint(glfw::WindowHint::OpenGlForwardCompat(true));
 
+    // glfw window creation
+    // --------------------
     let (mut window, events) = glfw.create_window(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", glfw::WindowMode::Windowed)
         .expect("Failed to create GLFW window");
 
@@ -31,14 +63,54 @@ pub fn run() -> Result<(), ShaderError>{
     window.set_key_polling(true);
     window.set_framebuffer_size_polling(true);
 
+    // gl: load all OpenGL function pointers
+    // ---------------------------------------
     gl::load_with(|symbol| window.get_proc_address(symbol) as *const _);
-    
-    //openGL'ing
-    let (program, VAO) = unsafe {
 
-        let vertex_shader = Shader::new("src/basic.vs", gl::VERTEX_SHADER)?;
-        let fragment_shader = Shader::new("src/basic.frag", gl::FRAGMENT_SHADER)?;
-        let program = ShaderProgram::new(&[vertex_shader, fragment_shader])?;
+    let (shaderProgram, VAO) = unsafe {
+        // build and compile our shader program
+        // ------------------------------------
+        // vertex shader
+        let vertexShader = gl::CreateShader(gl::VERTEX_SHADER);
+        let c_str_vert = CString::new(vertexShaderSource.as_bytes()).unwrap();
+        gl::ShaderSource(vertexShader, 1, &c_str_vert.as_ptr(), ptr::null());
+        gl::CompileShader(vertexShader);
+
+        // check for shader compile errors
+        let mut success = gl::FALSE as GLint;
+        let mut infoLog = Vec::with_capacity(512);
+        infoLog.set_len(512 - 1); // subtract 1 to skip the trailing null character
+        gl::GetShaderiv(vertexShader, gl::COMPILE_STATUS, &mut success);
+        if success != gl::TRUE as GLint {
+            gl::GetShaderInfoLog(vertexShader, 512, ptr::null_mut(), infoLog.as_mut_ptr() as *mut GLchar);
+            println!("ERROR::SHADER::VERTEX::COMPILATION_FAILED\n{}", str::from_utf8(&infoLog).unwrap());
+        }
+
+        // fragment shader
+        let fragmentShader = gl::CreateShader(gl::FRAGMENT_SHADER);
+        let c_str_frag = CString::new(fragmentShaderSource.as_bytes()).unwrap();
+        gl::ShaderSource(fragmentShader, 1, &c_str_frag.as_ptr(), ptr::null());
+        gl::CompileShader(fragmentShader);
+        // check for shader compile errors
+        gl::GetShaderiv(fragmentShader, gl::COMPILE_STATUS, &mut success);
+        if success != gl::TRUE as GLint {
+            gl::GetShaderInfoLog(fragmentShader, 512, ptr::null_mut(), infoLog.as_mut_ptr() as *mut GLchar);
+            println!("ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n{}", str::from_utf8(&infoLog).unwrap());
+        }
+
+        // link shaders
+        let shaderProgram = gl::CreateProgram();
+        gl::AttachShader(shaderProgram, vertexShader);
+        gl::AttachShader(shaderProgram, fragmentShader);
+        gl::LinkProgram(shaderProgram);
+        // check for linking errors
+        gl::GetProgramiv(shaderProgram, gl::LINK_STATUS, &mut success);
+        if success != gl::TRUE as GLint {
+            gl::GetProgramInfoLog(shaderProgram, 512, ptr::null_mut(), infoLog.as_mut_ptr() as *mut GLchar);
+            println!("ERROR::SHADER::PROGRAM::COMPILATION_FAILED\n{}", str::from_utf8(&infoLog).unwrap());
+        }
+        gl::DeleteShader(vertexShader);
+        gl::DeleteShader(fragmentShader);
 
         // set up vertex data (and buffer(s)) and configure vertex attributes
         // ------------------------------------------------------------------
@@ -88,7 +160,7 @@ pub fn run() -> Result<(), ShaderError>{
         // uncomment this call to draw in wireframe polygons.
         // gl::PolygonMode(gl::FRONT_AND_BACK, gl::LINE);
 
-        (program, VAO)
+        (shaderProgram, VAO)
     };
 
     // render loop
@@ -105,7 +177,10 @@ pub fn run() -> Result<(), ShaderError>{
             gl::Clear(gl::COLOR_BUFFER_BIT);
 
             // draw our first triangle
-            program.bind();
+            gl::UseProgram(shaderProgram);
+            let name = CString::new("u_resolution").unwrap();
+            let location = gl::GetUniformLocation(shaderProgram, name.as_ptr());
+            gl::Uniform2f(location, SCR_WIDTH as f32, SCR_HEIGHT as f32);
             gl::BindVertexArray(VAO); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
             // gl::DrawArrays(gl::TRIANGLES, 0, 3);
             gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, ptr::null());
@@ -117,7 +192,6 @@ pub fn run() -> Result<(), ShaderError>{
         window.swap_buffers();
         glfw.poll_events();
     }
-    Ok(())
 }
 
 // NOTE: not the same version as in common.rs!
