@@ -19,7 +19,11 @@ const SCR_HEIGHT: u32 = 600;
 const vertexShaderSource: &str = r#"
     #version 330 core
     layout (location = 0) in vec3 aPos;
+
+    out vec3 v_pos;
+
     void main() {
+        v_pos = aPos;
        gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);
     }
 "#;
@@ -27,10 +31,13 @@ const vertexShaderSource: &str = r#"
 const fragmentShaderSource: &str = r#"
     #version 330 core
     out vec4 fragColor;
+
     uniform vec2 u_resolution;
 
+    in vec3 v_pos;
+
     void main() {
-        vec2 uv = gl_FragCoord.xy/u_resolution.xy * 2.0 - 1.0;
+        vec2 uv = vec2(v_pos.x * 2.0, v_pos.y * 2.0);
 
         float aspect = u_resolution.x / u_resolution.y;
         uv.x *= aspect;
@@ -39,7 +46,12 @@ const fragmentShaderSource: &str = r#"
         fragColor.b = 0.0;
         float distance = 1.0 - length(uv); 
         distance = step(0.0, distance);
-        fragColor.rgb = vec3(distance);        
+        fragColor.rgb = vec3(distance);       
+        if(distance <= 0.0){
+            fragColor.a = 0.0;    
+        }else{
+            fragColor.a = 1.0;
+        }
 
     }
 "#;
@@ -66,6 +78,10 @@ pub fn run() {
     // gl: load all OpenGL function pointers
     // ---------------------------------------
     gl::load_with(|symbol| window.get_proc_address(symbol) as *const _);
+    unsafe{
+        gl::Enable(gl::BLEND);
+        gl::BlendFunc(gl::SRC_ALPHA,gl::ONE_MINUS_SRC_ALPHA);
+    }
 
     let (shaderProgram, VAO) = unsafe {
         // build and compile our shader program
