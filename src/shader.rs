@@ -107,6 +107,19 @@ impl ShaderProgram{
         let attrib = CString::new(attrib)?;
         Ok(gl::GetAttribLocation(self.id, attrib.as_ptr()) as GLuint)
     }
+    
+    pub unsafe fn set_uniform_2f(&self, name: &str, f1: f32, f2: f32){
+        let name = CString::new(name).unwrap();
+        let location = gl::GetUniformLocation(self.id, name.as_ptr());
+        gl::Uniform2f(location, f1, f2);
+    }
+    
+    pub unsafe fn set_uniform_mat4(&self, name: &str, mat: &[[f32; 4]; 4]){
+        let name = CString::new(name).unwrap();
+        let location = gl::GetUniformLocation(self.id, name.as_ptr());
+        gl::UniformMatrix4fv(location, 1, gl::FALSE, mat.as_ptr() as *const f32);
+    }
+    
 }
 
 impl Drop for ShaderProgram{
