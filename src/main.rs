@@ -45,9 +45,18 @@ pub fn main() {
      
     //NOT SETUP CODE HERE    
     let mut world_mat = math::Mat4::identity();
-    world_mat.scale(0.5);
+    world_mat.ortho(SCR_WIDTH as f32, SCR_HEIGHT as f32);
+
     let mut renderer = Renderer::new(world_mat);
-    renderer.setup_quad_info();
+    let result = renderer.setup_quad_info(math::Point3::new(0.0, 0.0, 1.0), math::Point3::new(400.0, 300.0, 0.0), math::Point3::new(0.0, 1.0, 0.0));
+
+    match result{
+        Err(err_message) => {
+            println!("{}", err_message);
+            assert!(false);
+        },
+        Ok(_) => (),
+    }
 
     while !window.should_close() {
         // events
