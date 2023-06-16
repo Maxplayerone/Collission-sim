@@ -1,3 +1,17 @@
+pub struct Point2{
+    pub x: f32,
+    pub y: f32,
+}
+
+impl Point2{
+    pub fn new(x: f32, y: f32) -> Self{
+        Self{
+            x,
+            y,
+        }
+    }
+}
+
 pub struct Point3{
     pub x: f32,
     pub y: f32,
@@ -15,6 +29,20 @@ impl Point3{
     
     pub fn raw(&self) -> [f32; 3]{
         [self.x, self.y, self.z]
+    }
+}
+
+pub struct Vec2{
+    pub x: f32,
+    pub y: f32,
+}
+
+impl Vec2{
+    pub fn new(x: f32, y: f32) -> Self{
+        Self{
+            x,
+            y,
+        }
     }
 }
 

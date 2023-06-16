@@ -10,6 +10,7 @@ mod buffer;
 mod shader;
 mod math;
 mod vertex_array;
+mod texture;
 
 use renderer::Renderer;
 
@@ -41,14 +42,17 @@ pub fn main() {
     unsafe{
         gl::Enable(gl::BLEND);
         gl::BlendFunc(gl::SRC_ALPHA,gl::ONE_MINUS_SRC_ALPHA);
+        //gl::PolygonMode(gl::FRONT_AND_BACK, gl::LINE);
     }
      
-    //NOT SETUP CODE HERE    
+    //NOTE: NOT SETUP CODE HERE    
     let mut world_mat = math::Mat4::identity();
-    world_mat.ortho(SCR_WIDTH as f32, SCR_HEIGHT as f32);
+    //world_mat.ortho(SCR_WIDTH as f32, SCR_HEIGHT as f32);
+    //world_mat.scale(0.5);
 
     let mut renderer = Renderer::new(world_mat);
-    let result = renderer.setup_quad_info(math::Point3::new(0.0, 0.0, 1.0), math::Point3::new(400.0, 300.0, 0.0), math::Point3::new(0.0, 1.0, 0.0));
+    //let result = renderer.setup_quad_info(math::Point3::new(-0.5, -0.5, 0.0), math::Point3::new(0.0, 1.0, 0.0));
+    let result = renderer.setup_texture_color_info(math::Point3::new(-0.5, -0.5, 0.0), math::Point3::new(0.0, 1.0, 0.0), "assets/circle.png");
 
     match result{
         Err(err_message) => {
@@ -63,7 +67,9 @@ pub fn main() {
         // -----
         process_events(&mut window, &events);
         renderer.clear_surface(math::Point3::new(0.2, 0.3, 0.4));
-        renderer.draw_quad();
+        //renderer.draw_quad();
+        //renderer.draw_texture();
+        renderer.draw_texture_color();
         
         window.swap_buffers();
         glfw.poll_events();
